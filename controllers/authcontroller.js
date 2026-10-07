@@ -1,48 +1,68 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const Admin = require("../models/admin");
+const Student = require("../models/student");
+const Attendance = require("../models/attendance");
 
-// POST /api/auth/entrance  (hidden register, only from Postman)
-exports.entrance = async (req, res) => {
+// today's date in India time, format YYYY-MM-DD
+const getToday = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+// GET /api/attendance/today
+exports.getTodayAttendance = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res
-        .status(400)
-        .json({ message: "Username and password required" });
-    }
-    const exists = await Admin.findOne({ username });
-    if (exists)
-      return res.status(400).json({ message: "Username already exists" });
+    const date = getToday();
 
-    const hashed = await bcrypt.hash(password, 10);
-    await Admin.create({ username, password: hashed });
-    res.status(201).json({ message: "Admin created" });
+    const students = await Student.find();
+    students.sort((a, b) =>
+      a.studentId.localeCompare(b.studentId, undefined, { numeric: true })
+    );
+
+    // only keep ids of students that still exist (ignores deleted students)
+    const validIds = new Set(students.map((s) => String(s._id)));
+    const record = await Attendance.findOne({ date });
+    const presentIds = record
+      ? record.presentStudents
+          .map((id) => String(id))
+          .filter((id) => validIds.has(id))
+      : [];
+
+    res.json({ date, students, presentIds });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// POST /api/auth/login
-exports.login = async (req, res) => {
+// PUT /api/attendance/today   body: { studentIds: [ ... ] }
+exports.saveTodayAttendance = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const admin = await Admin.findOne({ username });
-    if (!admin)
-      return res.status(400).json({ message: "Invalid username or password" });
+    const date = getToday();
 
-    const ok = await bcrypt.compare(password, admin.password);
-    if (!ok)
-      return res.status(400).json({ message: "Invalid username or password" });
+    // if the page was left open past midnight, don't overwrite the new day
+    if (req.body.date && req.body.date !== date) {
+      return res.status(409).json({
+        message: "A new day has started. Please reload.",
+        date,
+      });
+    }
 
-    const token = jwt.sign(
-      { id: admin._id, username: admin.username },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1d",
-      }
+    const requested = Array.isArray(req.body.studentIds)
+      ? req.body.studentIds
+      : [];
+
+    // save only ids of students that really exist
+    const existing = await Student.find({ _id: { $in: requested } }).select(
+      "_id"
     );
-    res.json({ token, username: admin.username });
+    const studentIds = existing.map((s) => s._id);
+
+    const record = await Attendance.findOneAndUpdate(
+      { date },
+      { presentStudents: studentIds },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({
+      message: "Attendance saved",
+      date,
+      count: record.presentStudents.length,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

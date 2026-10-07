@@ -34,6 +34,33 @@ exports.createStudent = async (req, res) => {
   }
 };
 
+// PUT /api/students/:id  (edit name and/or ID)
+exports.updateStudent = async (req, res) => {
+  try {
+    const name = (req.body.name || "").trim();
+    const studentId = String(req.body.studentId || "").trim();
+    if (!name || !studentId) {
+      return res.status(400).json({ message: "Name and ID are required" });
+    }
+    const student = await Student.findByIdAndUpdate(
+      req.params.id,
+      { name, studentId },
+      { new: true, runValidators: true }
+    );
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    res.json(student);
+  } catch (err) {
+    if (err.code === 11000) {
+      return res
+        .status(400)
+        .json({ message: "This student ID already exists" });
+    }
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // DELETE /api/students/:id
 exports.deleteStudent = async (req, res) => {
   try {

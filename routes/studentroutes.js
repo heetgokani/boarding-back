@@ -5,6 +5,7 @@ const auth = require("../middleware/auth");
 const {
   getStudents,
   createStudent,
+  updateStudent,
   deleteStudent,
   importStudents,
   exportStudents,
@@ -16,6 +17,7 @@ router.get("/export", auth, exportStudents);
 router.post("/import", auth, upload.single("file"), importStudents);
 router.get("/", auth, getStudents);
 router.post("/", auth, createStudent);
+router.put("/:id", auth, updateStudent);
 router.delete("/:id", auth, deleteStudent);
 
 module.exports = router;
