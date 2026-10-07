@@ -1,12 +1,13 @@
 const ExcelJS = require("exceljs");
 const Student = require("../models/student");
 
-// GET /api/students
+// GET /api/students  (sorted by ID numerically: 1, 2, 3 ... 10, 11)
 exports.getStudents = async (req, res) => {
   try {
-    const students = await Student.find()
-      .collation({ locale: "en", numericOrdering: true })
-      .sort({ studentId: 1 });
+    const students = await Student.find();
+    students.sort((a, b) =>
+      a.studentId.localeCompare(b.studentId, undefined, { numeric: true })
+    );
     res.json(students);
   } catch (err) {
     res.status(500).json({ message: err.message });
