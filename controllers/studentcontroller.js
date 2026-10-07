@@ -4,7 +4,9 @@ const Student = require("../models/student");
 // GET /api/students
 exports.getStudents = async (req, res) => {
   try {
-    const students = await Student.find().sort({ name: 1 });
+    const students = await Student.find()
+      .collation({ locale: "en", numericOrdering: true })
+      .sort({ studentId: 1 });
     res.json(students);
   } catch (err) {
     res.status(500).json({ message: err.message });
