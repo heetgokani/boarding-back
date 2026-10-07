@@ -34,6 +34,15 @@ exports.getTodayAttendance = async (req, res) => {
 exports.saveTodayAttendance = async (req, res) => {
   try {
     const date = getToday();
+
+    // if the page was left open past midnight, don't overwrite the new day
+    if (req.body.date && req.body.date !== date) {
+      return res.status(409).json({
+        message: "A new day has started. Please reload.",
+        date,
+      });
+    }
+
     const requested = Array.isArray(req.body.studentIds)
       ? req.body.studentIds
       : [];
